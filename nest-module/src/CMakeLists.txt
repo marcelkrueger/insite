@@ -47,6 +47,7 @@ set( MODULE_SOURCES
      storage/data_storage.hpp storage/data_storage.cpp
      storage/spikedetector_storage.hpp storage/spikedetector_storage.cpp
      storage/multimeter_storage.hpp storage/multimeter_storage.cpp
+     stimulation_backend_insite.h stimulation_backend_insite.cpp
    )
 
 # 3) We require a header name like this:

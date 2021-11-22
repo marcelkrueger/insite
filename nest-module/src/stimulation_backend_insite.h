@@ -51,6 +51,7 @@ public:
 private:
   bool enrolled_;
   bool prepared_;
+  nest::StimulationDevice* dev = nullptr;
 
 };
 

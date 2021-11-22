@@ -11,5 +11,9 @@ services:
 
   insite-nest-module:
     build: ./nest-module
+    volumes:
+      - ./scripts:/scripts/
     ports:
       - "9000-9005:9000-9005"
+    environment:
+      - SCRIPT_NAME=stim.py
