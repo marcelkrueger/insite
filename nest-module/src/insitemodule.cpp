@@ -5,6 +5,7 @@
 
 // include headers with your own stuff
 #include "recording_backend_insite.h"
+#include "stimulation_backend_insite.h"
 
 // Includes from nestkernel:
 #include "connection_manager_impl.h"
@@ -75,6 +76,7 @@ const std::string InsiteModule::name(void) const {
 void InsiteModule::init(SLIInterpreter* i) {
   nest::kernel().io_manager.register_recording_backend<RecordingBackendInsite>(
       "insite");
+  nest::kernel().io_manager.register_stimulation_backend<StimulationBackendInsite>("insiteStim");
 }  // InsiteModule::init()
 
 }  // namespace insite
