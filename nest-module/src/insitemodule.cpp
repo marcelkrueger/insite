@@ -74,10 +74,9 @@ const std::string InsiteModule::name(void) const {
 //-------------------------------------------------------------------------------------
 
 void InsiteModule::init(SLIInterpreter* i) {
+    nest::kernel().io_manager.register_stimulation_backend<StimulationBackendInsite>("insiteStim");
   nest::kernel().io_manager.register_recording_backend<RecordingBackendInsite>(
       "insite");
-  nest::kernel().io_manager.register_stimulation_backend<StimulationBackendInsite>("insiteStim");
-  std::cout << "Valid Stim: " << nest::kernel().io_manager.is_valid_stimulation_backend("insiteStim") <<  std::endl;
 }  // InsiteModule::init()
 
 }  // namespace insite

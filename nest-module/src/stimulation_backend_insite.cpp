@@ -25,6 +25,7 @@
 #include <fstream>
 #include <vector>
 #include <algorithm>
+#include "rapidjson/document.h"
 
 // Includes from nestkernel:
 #include "stimulation_backend.h"
@@ -32,84 +33,148 @@
 #include "kernel_manager.h"
 #include "stimulation_device.h"
 
+using namespace rapidjson;
+using namespace std;
+
+
+
 insite::StimulationBackendInsite::StimulationBackendInsite()
   : enrolled_( false )
   , prepared_( false )
+  , http_listener_{"http://0.0.0.0:9100"}
 {
+    http_listener_.support([this](web::http::http_request request){
+        if (request.method() == "POST" && request.relative_uri().path() == "/stim")
+        {
+            auto req = request.extract_string().get();
+            Document document;
+            document.Parse(req.c_str());
+            
+            if (not (document.HasMember("nodeIds") && document.HasMember("spikeTimes")))
+            {
+                std::cout << "[insite] Either nodeIds or spikeTimes is missing" << std::endl;
+
+                web::http::http_response response(web::http::status_codes::BadRequest);
+                request.reply(response);
+                return;
+            }
+            else if(not (document["nodeIds"].IsArray() && document["spikeTimes"].IsArray()))
+            {
+                std::cout << "[insite] Either nodeIds or spikeTimes not an array" << std::endl;
+                web::http::http_response response(web::http::status_codes::BadRequest);
+                request.reply(response);
+                return;
+            }
+            else if (not (document["nodeIds"].Size() == document["spikeTimes"].Size()))
+            {
+                std::cout << "[insite] NodeIds and spikeTimes did not have the same length!" << std::endl;
+                web::http::http_response response(web::http::status_codes::BadRequest);
+                request.reply(response);
+                return;
+            }
+
+            for (int i = 0; i < document["nodeIds"].Size(); ++i)
+            {
+                std::uint64_t  nodeId = document["nodeIds"][i].GetInt();
+                double time = document["spikeTimes"][i].GetDouble();
+                std::cout << "[insite] " << nodeId << " - " << time << std::endl;
+                
+                const auto stimulation_device_spikes = stimulation_spikes.find(nodeId);
+                if(stimulation_device_spikes != stimulation_spikes.end())
+                {
+                    stimulation_device_spikes->second.push_back(time);
+                }
+            }
+
+            std::cout << "[insite] Spikes stored in stimulation vector: " << std::endl;
+            for (const auto& m : stimulation_spikes)
+            {
+                for (const auto& v : m.second)
+                {
+                    std::cout << "[insite] " << m.first << " - " << v << std::endl;
+                }
+            }
+
+            web::http::http_response response(web::http::status_codes::OK);
+            request.reply(response);
+        }
+
+
+    });
+
+    http_listener_.open().wait();
+    std::cout << "[insite] Started stimulation HTTP server" << std::endl;
 }
 
 insite::StimulationBackendInsite::~StimulationBackendInsite() noexcept
 {
-    std::cout << "[insite] stim backend ctor" << std::endl;
+    std::cout << "[insite] Stimulation backend ctor" << std::endl;
 }
 
 
 void
 insite::StimulationBackendInsite::initialize()
 {
-    std::cout << "[insite] stim backend init" << std::endl;
+    std::cout << "[insite] Stimulation backend init" << std::endl;
 }
 
 void
 insite::StimulationBackendInsite::finalize()
 {
-    std::cout << "[insite] stim backend finalize" << std::endl;
+    std::cout << "[insite] Stimulation backend finalize" << std::endl;
 }
 
 void
 insite::StimulationBackendInsite::enroll( nest::StimulationDevice& device, const DictionaryDatum& )
 {
-    std::cout << "[insite] stim backend enroll" << std::endl;
-    dev = &device;
+    const std::uint64_t node_id = device.get_node_id();
+    if (stimulation_devices_.find(node_id) == stimulation_devices_.end())
+    {
+        std::cout << "[insite] Enrolled Stimulation device with id: " << node_id << std::endl;
+        stimulation_devices_.insert(std::make_pair(node_id,&device));
+        stimulation_spikes.insert(std::make_pair(node_id,std::vector<double>()));
+    }
 }
 
 
 void
 insite::StimulationBackendInsite::disenroll( nest::StimulationDevice& device )
 {
-    std::cout << "[insite] stim backend disenroll" << std::endl;
+    std::cout << "[insite] Stimulation backend disenroll" << std::endl;
 }
 
 void
 insite::StimulationBackendInsite::prepare()
 {
-    std::cout << "[insite] stim backend prepare" << std::endl;
+    std::cout << "[insite] Stimulation backend prepare" << std::endl;
 }
 
 void
 insite::StimulationBackendInsite::pre_run_hook()
 {
-    std::cout << "[insite] stim backend pre run hook" << std::endl;
-    std::vector<double> spikes;
-    for (int i = 0; i < 10; i++)
-    {
-        double f = (double)rand() / RAND_MAX;
-        spikes.push_back(f * 30);
-    }
-    std::cout << "generated values: " << std::endl;
-    for (const auto& val : spikes)
-        std::cout << val << std::endl;
-    std::sort(spikes.begin(),spikes.end());
-    std::cout << "generated values: " << std::endl;
-    for (const auto& val : spikes)
-        std::cout << val << std::endl;
-    if(dev)
-    {
-        std::cout << "Set new stimuli" << std::endl;
-        dev->set_data_from_stimulation_backend(spikes);
+    std::cout << "[insite] Stimulation backend pre run hook" << std::endl;
 
+    for (const auto& stimulation_device : stimulation_devices_)
+    {
+        auto device_id = stimulation_device.first;
+        std::cout << "[insite] Set stimuli for device: " << device_id << std::endl;
+        auto& spikes = stimulation_spikes[device_id];
+        std::sort(spikes.begin(),spikes.end());
+        for (const auto& spike : spikes)
+            std::cout << device_id << " - " << spike << std::endl;
+        stimulation_device.second->set_data_from_stimulation_backend(spikes);
     }
 }
 
 void
 insite::StimulationBackendInsite::post_run_hook()
 {
-    std::cout << "[insite] stim backend post run hook" << std::endl;
+    std::cout << "[insite] Stimulation backend post run hook" << std::endl;
 }
 
 void
 insite::StimulationBackendInsite::cleanup()
 {
-    std::cout << "[insite] stim backend cleanup" << std::endl;
+    std::cout << "[insite] Stimulation backend cleanup" << std::endl;
 }
 

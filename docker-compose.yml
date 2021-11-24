@@ -15,5 +15,6 @@ services:
       - ./scripts:/scripts/
     ports:
       - "9000-9005:9000-9005"
+      - "9100:9100"
     environment:
       - SCRIPT_NAME=stim.py

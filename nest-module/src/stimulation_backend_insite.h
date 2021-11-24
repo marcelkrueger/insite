@@ -13,6 +13,8 @@
 #include <unistd.h>
 #include <mpi.h>
 
+#include <cpprest/http_client.h>
+#include <cpprest/http_listener.h>
 
 namespace insite
 {
@@ -52,7 +54,10 @@ private:
   bool enrolled_;
   bool prepared_;
   nest::StimulationDevice* dev = nullptr;
-
+  web::http::experimental::listener::http_listener http_listener_;
+  std::vector<double> spikes;
+  std::unordered_map<std::uint64_t, std::vector<double>> stimulation_spikes;
+  std::unordered_map<std::uint64_t, nest::StimulationDevice*> stimulation_devices_;
 };
 
 } // namespace
